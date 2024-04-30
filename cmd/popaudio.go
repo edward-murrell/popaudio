@@ -20,5 +20,6 @@ func main() {
 	if err != nil {
 		println("error getting DLNA client", err)
 	}
-	ui.NewScanLineBrowser(dlnaClient).Run()
+	//ui.NewScanLineBrowser(dlnaClient).Run()
+	ui.NewFyneDisplay(dlnaClient).Run()
 }
