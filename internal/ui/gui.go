@@ -14,7 +14,11 @@ import (
 )
 
 type FyneDisplay struct {
-	dlna *dlnaclient.DlnaClient
+	dlna               *dlnaclient.DlnaClient
+	containerList      []model.Container
+	itemList           []model.Item
+	containDisplayList *widget.List
+	itemDisplayList    *widget.List
 }
 
 func NewFyneDisplay(dlna *dlnaclient.DlnaClient) *FyneDisplay {
@@ -23,64 +27,65 @@ func NewFyneDisplay(dlna *dlnaclient.DlnaClient) *FyneDisplay {
 	}
 }
 
-func (b *FyneDisplay) Run() {
-	var containerList *[]model.Container
-	var itemList *[]model.Item
-	root, err := b.dlna.GetRoot()
+func (disp *FyneDisplay) Run() {
+	root, err := disp.dlna.GetRoot()
 
 	if err != nil {
 		println("error getting root", err)
 		os.Exit(1) // Give up
 	}
-	containerList = &root.Containers
-	itemList = &root.Items
+	disp.containerList = root.Containers
+	disp.itemList = root.Items
 
 	myApp := app.New()
 	myWindow := myApp.NewWindow("List Widget")
 	myWindow.FullScreen()
-	listFolders := widget.NewList(
+	disp.containDisplayList = widget.NewList(
 		func() int {
-			return len(*containerList)
+			return len(disp.containerList)
 		},
 		func() fyne.CanvasObject {
 			return widget.NewButton("template", func() {})
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
-			x := *containerList
+			x := disp.containerList
 			o.(*widget.Button).SetText(x[i].Title)
 			o.(*widget.Button).OnTapped = func() {
-				b.BrowseContainer(&x[i], &containerList, &itemList)
+				disp.BrowseContainer(&x[i])
 			}
 		})
-	listItems := widget.NewList(
+	disp.itemDisplayList = widget.NewList(
 		func() int {
-			return len(*itemList)
+			return len(disp.itemList)
 		},
 		func() fyne.CanvasObject {
 			return widget.NewButton("template", func() {})
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
-			items := *itemList
+			items := disp.itemList
 			o.(*widget.Button).SetText(items[i].Title)
 			o.(*widget.Button).OnTapped = func() {
-				audio.PlayHttpPath(items[i].Res.Text)
+				println("playing", items[i].Res.ProtocolInfo)
+				go audio.PlayHttpPath(items[i].Res.Text)
 			}
-
 		})
 
-	myWindow.SetContent(container.New(layout.NewHBoxLayout(), listFolders, listItems))
+	myWindow.SetContent(container.New(layout.NewHBoxLayout(), disp.containDisplayList, disp.itemDisplayList))
+	myWindow.SetFullScreen(true)
 	myWindow.ShowAndRun()
 }
 
-func (b *FyneDisplay) BrowseContainer(con *model.Container, conList **[]model.Container, itemList **[]model.Item) {
+func (disp *FyneDisplay) BrowseContainer(con *model.Container) {
 	fmt.Printf("requesting ID: %s", con.ID)
-	o, err := b.dlna.Browse(con)
+	o, err := disp.dlna.Browse(con)
 
 	if err != nil {
 		println("Error: ", err)
 		return
 	}
 	println("done")
-	*conList = &o.Containers
-	*itemList = &o.Items
+	disp.containerList = o.Containers
+	disp.itemList = o.Items
+	disp.containDisplayList.Refresh()
+	disp.itemDisplayList.Refresh()
 }
